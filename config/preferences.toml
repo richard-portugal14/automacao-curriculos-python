@@ -1,0 +1,32 @@
+[search]
+country = "br"
+results_per_page = 20
+max_pages_per_query = 1
+
+# Cada termo será enviado como uma consulta independente. Variações aumentam
+# a cobertura; vagas repetidas entre consultas são unificadas no SQLite.
+terms = [
+  "estágio dados",
+  "estágio análise de dados",
+  "estágio business intelligence",
+  "estágio BI",
+  "estágio Python SQL",
+  "estágio analytics",
+  "estágio tecnologia da informação",
+]
+
+# Consultas localizadas priorizam São Paulo; consultas sem where podem ser
+# ativadas posteriormente para capturar posições remotas ou de outras cidades.
+locations = ["São Paulo"]
+
+[preferences]
+areas_priority = ["Dados", "Análise de Dados", "BI", "Analytics", "TI"]
+work_models = ["presencial", "híbrido", "remoto"]
+employment_types_allowed = ["estagio"]
+
+[scoring.weights]
+skills = 40
+area = 20
+level = 15
+location = 15
+preferences = 10

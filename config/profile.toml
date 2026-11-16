@@ -1,0 +1,17 @@
+[profile]
+name = ""
+education = "Ciência da Computação — superior incompleto"
+professional_level = "estagio_inicio_carreira"
+skills = [
+  "Python",
+  "Pandas",
+  "NumPy",
+  "SQL",
+  "Excel",
+  "Power BI",
+  "Análise de Dados",
+  "Fundamentos de IA",
+  "JavaScript",
+  "Git",
+  "GitHub",
+]
