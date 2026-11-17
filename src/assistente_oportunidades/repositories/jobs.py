@@ -72,6 +72,19 @@ class JobRepository:
             "SELECT * FROM jobs WHERE deduplication_key = ?", (deduplication_key,)
         ).fetchone()
 
+    def list_for_inspection(self, limit: int = 10) -> list[sqlite3.Row]:
+        """Retorna os campos necessários para inspecionar anúncios armazenados."""
+        if limit < 1:
+            raise ValueError("O limite de vagas deve ser pelo menos 1.")
+        rows = self._connection.execute(
+            """SELECT title, company, location, contract_type, category, description, url
+            FROM jobs
+            ORDER BY collected_at DESC, id DESC
+            LIMIT ?""",
+            (limit,),
+        )
+        return list(rows.fetchall())
+
     def _initialize(self) -> None:
         self._connection.execute(
             """CREATE TABLE IF NOT EXISTS jobs (
