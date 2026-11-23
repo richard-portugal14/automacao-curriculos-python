@@ -11,6 +11,11 @@ from pathlib import Path
 from assistente_oportunidades.config import load_config
 from assistente_oportunidades.repositories.jobs import JobRepository
 from assistente_oportunidades.services.collect import collect_adzuna
+from assistente_oportunidades.services.area_classifier import AreaCategory
+from assistente_oportunidades.services.area_diagnostic import (
+    AreaClassifiedJob,
+    diagnose_stored_areas,
+)
 from assistente_oportunidades.services.internship_classifier import InternshipClassification
 from assistente_oportunidades.services.internship_diagnostic import (
     ClassifiedJob,
@@ -41,6 +46,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="classifica as vagas do SQLite e mostra um diagnóstico",
     )
     diagnose.add_argument("--database", type=Path, default=Path("data/jobs.sqlite3"))
+
+    diagnose_areas = commands.add_parser(
+        "diagnose-areas",
+        help="classifica a área das vagas confirmadas como estágio no SQLite",
+    )
+    diagnose_areas.add_argument("--database", type=Path, default=Path("data/jobs.sqlite3"))
     return parser
 
 
@@ -104,6 +115,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         _print_classified_jobs("INCERTO", report.uncertain)
         return 0
 
+    if args.command == "diagnose-areas":
+        try:
+            report = diagnose_stored_areas(args.database)
+        except (OSError, sqlite3.Error, ValueError) as exc:
+            print(f"Erro no diagnóstico de áreas: {exc}", file=sys.stderr)
+            return 1
+
+        print(f"Total de vagas analisadas: {report.total}")
+        for category in AreaCategory:
+            count = report.counts[category]
+            percentage = report.percentages[category]
+            print(f"{category.value}: {count} ({percentage:.1f}%)")
+        _print_area_classified_jobs(report.classified_jobs)
+        return 0
+
     return 2
 
 
@@ -124,6 +150,34 @@ def _print_classified_jobs(label: str, items: list[ClassifiedJob]) -> None:
                     f"  Título: {title}",
                     f"  Empresa: {company}",
                     f"  Classificação: {item.result.classification.value}",
+                    f"  Explicação: {explanation}",
+                )
+            )
+        )
+    print()
+    print("\n\n".join(records))
+
+
+def _print_area_classified_jobs(items: list[AreaClassifiedJob]) -> None:
+    print("\nVagas por área:")
+    if not items:
+        print("(nenhuma vaga classificada como ESTAGIO)")
+        return
+
+    records = []
+    for index, item in enumerate(items, start=1):
+        title = " ".join(item.job.title.split())
+        company = " ".join((item.job.company or "(não informada)").split())
+        evidence = ", ".join(item.result.evidence) or "(nenhuma)"
+        explanation = " ".join(item.result.explanation.split())
+        records.append(
+            "\n".join(
+                (
+                    f"Registro {index}:",
+                    f"  Título: {title}",
+                    f"  Empresa: {company}",
+                    f"  Área: {item.result.category.value}",
+                    f"  Evidências: {evidence}",
                     f"  Explicação: {explanation}",
                 )
             )
