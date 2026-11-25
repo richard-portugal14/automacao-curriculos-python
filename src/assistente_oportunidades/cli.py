@@ -21,6 +21,16 @@ from assistente_oportunidades.services.internship_diagnostic import (
     ClassifiedJob,
     diagnose_stored_jobs,
 )
+from assistente_oportunidades.services.profile_diagnostic import (
+    ProfileDiagnosedJob,
+    diagnose_stored_profile,
+)
+from assistente_oportunidades.services.profile_matcher import EducationCompatibility
+from assistente_oportunidades.services.score_diagnostic import (
+    SCORE_BANDS,
+    ScoreDiagnosedJob,
+    diagnose_stored_scores,
+)
 from assistente_oportunidades.sources.adzuna import AdzunaError
 
 
@@ -52,6 +62,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="classifica a área das vagas confirmadas como estágio no SQLite",
     )
     diagnose_areas.add_argument("--database", type=Path, default=Path("data/jobs.sqlite3"))
+
+    diagnose_profile = commands.add_parser(
+        "diagnose-profile",
+        help="compara vagas de estágio do SQLite com o perfil configurado",
+    )
+    diagnose_profile.add_argument("--database", type=Path, default=Path("data/jobs.sqlite3"))
+
+    diagnose_score = commands.add_parser(
+        "diagnose-score",
+        help="calcula e exibe o score das vagas de estágio existentes no SQLite",
+    )
+    diagnose_score.add_argument("--database", type=Path, default=Path("data/jobs.sqlite3"))
     return parser
 
 
@@ -130,6 +152,44 @@ def main(argv: Sequence[str] | None = None) -> int:
         _print_area_classified_jobs(report.classified_jobs)
         return 0
 
+    if args.command == "diagnose-profile":
+        try:
+            report = diagnose_stored_profile(args.database)
+        except (OSError, sqlite3.Error, ValueError) as exc:
+            print(f"Erro no diagnóstico de compatibilidade: {exc}", file=sys.stderr)
+            return 1
+
+        print(f"Total de vagas analisadas: {report.total}")
+        print(f"Com habilidades correspondentes: {report.with_skill_matches}")
+        print(f"Sem habilidades correspondentes: {report.without_skill_matches}")
+        for status in EducationCompatibility:
+            print(f"Formação {status.value}: {report.education_counts[status]}")
+        print("\nVagas por área:")
+        for area in AreaCategory:
+            print(f"{area.value}: {report.area_counts[area]}")
+        _print_profile_diagnosed_jobs(report.results)
+        return 0
+
+    if args.command == "diagnose-score":
+        try:
+            report = diagnose_stored_scores(args.database)
+        except (OSError, sqlite3.Error, ValueError) as exc:
+            print(f"Erro no diagnóstico do score: {exc}", file=sys.stderr)
+            return 1
+
+        print(f"Total de vagas analisadas: {report.total}")
+        print(f"Score médio: {_format_score(report.average)}")
+        print(f"Score máximo: {_format_score(report.maximum)}")
+        print(f"Score mínimo: {_format_score(report.minimum)}")
+        print("\nDistribuição por faixa:")
+        for band in SCORE_BANDS:
+            print(f"{band}: {report.score_band_counts[band]}")
+        print("\nVagas por área:")
+        for area in AreaCategory:
+            print(f"{area.value}: {report.area_counts[area]}")
+        _print_score_diagnosed_jobs(report.results)
+        return 0
+
     return 2
 
 
@@ -184,3 +244,86 @@ def _print_area_classified_jobs(items: list[AreaClassifiedJob]) -> None:
         )
     print()
     print("\n\n".join(records))
+
+
+def _print_profile_diagnosed_jobs(items: list[ProfileDiagnosedJob]) -> None:
+    print("\nDiagnóstico por vaga:")
+    if not items:
+        print("(nenhuma vaga classificada como ESTAGIO)")
+        return
+
+    education_labels = {
+        EducationCompatibility.COMPATIVEL: "Compatível",
+        EducationCompatibility.INCOMPATIVEL: "Incompatível",
+        EducationCompatibility.NAO_INFORMADO: "Não informado",
+    }
+    records = []
+    for index, item in enumerate(items, start=1):
+        title = " ".join(item.job.title.split())
+        company = " ".join((item.job.company or "(não informada)").split())
+        matched = ", ".join(item.match.matched_profile_skills) or "nenhuma"
+        missing = ", ".join(item.match.requirements_not_in_profile) or "nenhum"
+        education = education_labels[item.match.education.compatibility]
+        explanation = " ".join(item.match.explanation)
+        records.append(
+            "\n".join(
+                (
+                    f"Registro {index}:",
+                    f"  Título: {title}",
+                    f"  Empresa: {company}",
+                    f"  Área: {item.match.area.value}",
+                    f"  Habilidades correspondentes: {matched}",
+                    f"  Requisitos não encontrados: {missing}",
+                    f"  Formação: {education}",
+                    f"  Explicação: {explanation}",
+                )
+            )
+        )
+    print()
+    print("\n\n".join(records))
+
+
+def _print_score_diagnosed_jobs(items: list[ScoreDiagnosedJob]) -> None:
+    print("\nDiagnóstico detalhado por vaga:")
+    if not items:
+        print("(nenhuma vaga classificada como ESTAGIO)")
+        return
+
+    education_labels = {
+        EducationCompatibility.COMPATIVEL: "Compatível",
+        EducationCompatibility.INCOMPATIVEL: "Incompatível",
+        EducationCompatibility.NAO_INFORMADO: "Não informado",
+    }
+    records = []
+    for index, item in enumerate(items, start=1):
+        score = item.score
+        matched = ", ".join(item.match.matched_profile_skills) or "nenhuma"
+        missing = ", ".join(item.match.requirements_not_in_profile) or "nenhum"
+        explanations = " ".join(score.explicacao)
+        records.append(
+            "\n".join(
+                (
+                    f"Registro {index}:",
+                    f"  Título: {' '.join(item.job.title.split())}",
+                    f"  Empresa: {' '.join((item.job.company or '(não informada)').split())}",
+                    f"  Área: {item.area.category.value}",
+                    f"  Habilidades correspondentes: {matched}",
+                    f"  Requisitos não encontrados: {missing}",
+                    f"  Formação: {education_labels[item.match.education.compatibility]}",
+                    f"  Score área: {_format_score(score.score_area)}",
+                    f"  Score habilidades: {_format_score(score.score_habilidades)}",
+                    f"  Score formação: {_format_score(score.score_formacao)}",
+                    f"  Score localização: {_format_score(score.score_localizacao)}",
+                    f"  SCORE TOTAL: {_format_score(score.score_total)}",
+                    f"  Explicação do score: {explanations}",
+                )
+            )
+        )
+    print()
+    print("\n\n".join(records))
+
+
+def _format_score(value: float | None) -> str:
+    if value is None:
+        return "não disponível"
+    return f"{value:.2f}".replace(".", ",")
