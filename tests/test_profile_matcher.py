@@ -161,4 +161,7 @@ def test_profile_is_loaded_from_existing_configuration(profile: CandidateProfile
     assert "Python" in profile.skills
     assert "São Paulo" in profile.locations
     assert "remoto" in profile.work_models
-    assert profile.employment_types == ("estagio",)
+    assert tuple(area.value for area in profile.area_priorities[:2]) == (
+        "DADOS_ANALYTICS",
+        "BI",
+    )

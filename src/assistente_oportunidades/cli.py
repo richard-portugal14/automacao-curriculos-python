@@ -26,6 +26,9 @@ from assistente_oportunidades.services.profile_diagnostic import (
     diagnose_stored_profile,
 )
 from assistente_oportunidades.services.profile_matcher import EducationCompatibility
+from assistente_oportunidades.services.profile_matcher import load_candidate_profile
+from assistente_oportunidades.services.pipeline import run_pipeline
+from assistente_oportunidades.reports.console import render_console_report
 from assistente_oportunidades.services.score_diagnostic import (
     SCORE_BANDS,
     ScoreDiagnosedJob,
@@ -43,6 +46,11 @@ def build_parser() -> argparse.ArgumentParser:
     collect = commands.add_parser("collect", help="coleta vagas conforme config/preferences.toml")
     collect.add_argument("--config-dir", type=Path, default=Path("config"))
     collect.add_argument("--database", type=Path, default=Path("data/jobs.sqlite3"))
+
+    run = commands.add_parser("run", help="executa o pipeline completo de oportunidades")
+    run.add_argument("--config-dir", type=Path, default=Path("config"))
+    run.add_argument("--database", type=Path, default=Path("data/jobs.sqlite3"))
+    run.add_argument("--top-n", type=int, default=10, help="quantidade de oportunidades exibidas")
 
     inspect = commands.add_parser(
         "inspect-descriptions",
@@ -93,6 +101,24 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"{summary.inserted} novas e {summary.updated} atualizadas."
         )
         print(f"Banco de dados: {config.database_path}")
+        return 0
+
+    if args.command == "run":
+        if args.top_n < 0:
+            print("Erro no relatório: --top-n não pode ser negativo.", file=sys.stderr)
+            return 2
+        try:
+            config = load_config(config_dir=args.config_dir, database_path=args.database)
+            profile = load_candidate_profile(
+                args.config_dir / "profile.toml",
+                args.config_dir / "preferences.toml",
+            )
+            result = run_pipeline(config, profile)
+        except (AdzunaError, FileNotFoundError, ValueError, OSError, sqlite3.Error) as exc:
+            print(f"Erro na execução do pipeline: {exc}", file=sys.stderr)
+            return 1
+
+        print(render_console_report(result, top_n=args.top_n))
         return 0
 
     if args.command == "inspect-descriptions":

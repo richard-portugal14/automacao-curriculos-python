@@ -2,6 +2,7 @@
 country = "br"
 results_per_page = 20
 max_pages_per_query = 1
+max_days_old = 30
 
 # Cada termo será enviado como uma consulta independente. Variações aumentam
 # a cobertura; vagas repetidas entre consultas são unificadas no SQLite.
@@ -22,11 +23,3 @@ locations = ["São Paulo"]
 [preferences]
 areas_priority = ["Dados", "Análise de Dados", "BI", "Analytics", "TI"]
 work_models = ["presencial", "híbrido", "remoto"]
-employment_types_allowed = ["estagio"]
-
-[scoring.weights]
-skills = 40
-area = 20
-level = 15
-location = 15
-preferences = 10

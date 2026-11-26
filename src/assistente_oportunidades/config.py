@@ -10,6 +10,8 @@ from typing import Any
 
 from dotenv import load_dotenv
 
+DEFAULT_MAX_DAYS_OLD = 30
+
 
 @dataclass(frozen=True, slots=True)
 class SearchConfig:
@@ -18,6 +20,7 @@ class SearchConfig:
     locations: tuple[str, ...]
     results_per_page: int = 20
     max_pages_per_query: int = 1
+    max_days_old: int = DEFAULT_MAX_DAYS_OLD
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,12 +56,15 @@ def load_config(config_dir: Path | str = "config", database_path: Path | str = "
     country = str(search_doc.get("country", "br")).strip().lower()
     results_per_page = int(search_doc.get("results_per_page", 20))
     max_pages = int(search_doc.get("max_pages_per_query", 1))
+    max_days_old = int(search_doc.get("max_days_old", DEFAULT_MAX_DAYS_OLD))
     if not country.isalpha() or len(country) != 2:
         raise ValueError("search.country deve ser um código de país com duas letras.")
     if not 1 <= results_per_page <= 50:
         raise ValueError("search.results_per_page deve estar entre 1 e 50.")
     if max_pages < 1:
         raise ValueError("search.max_pages_per_query deve ser pelo menos 1.")
+    if max_days_old < 1:
+        raise ValueError("search.max_days_old deve ser pelo menos 1.")
     if not terms:
         raise ValueError("Configure ao menos um termo em search.terms.")
     if not locations:
@@ -67,7 +73,7 @@ def load_config(config_dir: Path | str = "config", database_path: Path | str = "
     return AppConfig(
         profile=profile_doc.get("profile", {}),
         preferences=preferences_doc.get("preferences", {}),
-        search=SearchConfig(country, terms, locations, results_per_page, max_pages),
+        search=SearchConfig(country, terms, locations, results_per_page, max_pages, max_days_old),
         app_id=os.getenv("ADZUNA_APP_ID") or None,
         app_key=os.getenv("ADZUNA_APP_KEY") or None,
         database_path=Path(database_path),

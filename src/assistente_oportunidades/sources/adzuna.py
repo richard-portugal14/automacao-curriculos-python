@@ -72,6 +72,7 @@ class AdzunaSource:
             "results_per_page": self.search_config.results_per_page,
             "what": term,
             "where": location,
+            "max_days_old": self.search_config.max_days_old,
             "content-type": "application/json",
         }
         try:

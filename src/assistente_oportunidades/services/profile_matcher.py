@@ -33,7 +33,6 @@ class CandidateProfile:
     area_priorities: tuple[AreaCategory, ...]
     locations: tuple[str, ...] = ()
     work_models: tuple[str, ...] = ()
-    employment_types: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,10 +161,6 @@ def load_candidate_profile(
         area_priorities=_area_priorities(area_names),
         locations=locations,
         work_models=_text_tuple(preferences.get("work_models", ()), "preferences.work_models"),
-        employment_types=_text_tuple(
-            preferences.get("employment_types_allowed", ()),
-            "preferences.employment_types_allowed",
-        ),
     )
 
 

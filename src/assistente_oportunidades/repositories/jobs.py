@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from assistente_oportunidades.models import Job
@@ -85,6 +85,30 @@ class JobRepository:
         )
         return list(rows.fetchall())
 
+    def list_all(self) -> list[Job]:
+        """Carrega vagas persistidas normalizadas, em ordem estável de inserção."""
+        rows = self._connection.execute(
+            """SELECT source, external_id, title, company, location, description, url,
+                published_at, collected_at
+            FROM jobs
+            ORDER BY id"""
+        ).fetchall()
+        return [
+            Job(
+                source=row["source"],
+                external_id=row["external_id"],
+                title=row["title"],
+                company=row["company"],
+                location=row["location"],
+                description=row["description"],
+                url=row["url"],
+                published_at=_parse_datetime(row["published_at"]),
+                collected_at=_parse_datetime(row["collected_at"])
+                or datetime.min.replace(tzinfo=timezone.utc),
+            )
+            for row in rows
+        ]
+
     def _initialize(self) -> None:
         self._connection.execute(
             """CREATE TABLE IF NOT EXISTS jobs (
@@ -132,3 +156,15 @@ def _job_values(job: Job) -> tuple[object, ...]:
 
 def _iso(value: datetime | None) -> str | None:
     return value.isoformat() if value else None
+
+
+def _parse_datetime(value: str | None) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
